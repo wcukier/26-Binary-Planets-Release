@@ -77,6 +77,20 @@ def get_hill_radius(a, e, m, m_star):
     return a * (1-e) * ((m*MASS_E)/(3*m_star*MASS_SUN))**(1/3)
 
 
+def orbits_cross(a1, e1, a2, e2, buffer1=0, buffer2=0):
+    """Return True if two orbits cross, i.e. their periapsis/apoapsis radial
+    ranges (about the star) overlap so that one is neither entirely inside nor
+    entirely outside the other.
+
+    ``buffer1``/``buffer2`` widen each orbit's radial range to account for the
+    physical extent of the body about its own barycenter -- e.g. for a binary
+    planet, pass the maximum displacement of a component from the binary
+    barycenter so the whole pair is checked, not just its center of mass."""
+    peri1, apo1 = a1 * (1 - e1) - buffer1, a1 * (1 + e1) + buffer1
+    peri2, apo2 = a2 * (1 - e2) - buffer2, a2 * (1 + e2) + buffer2
+    return max(peri1, peri2) <= min(apo1, apo2)
+
+
 
 
 def init_sim(m_star, n_log=1000, integrator="whfast",
@@ -144,7 +158,7 @@ def simulate(sim, log, t_end, mode):
         if halt:
             print("Unstable system.  Stopping...", file=sys.stderr)
             return sim, log, halt, t
-        log[2] = 1
+        log[3] = 1
     
         
     for t in np.linspace(0, t_end, n_log)[1:]:

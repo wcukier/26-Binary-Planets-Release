@@ -6,17 +6,29 @@ from os import sys
 def init_log(n_log, n_particles):
     elements = np.zeros((n_log, n_particles-1, 6)) * np.nan
     distances = np.zeros(n_log) * np.nan
+    # state vectors (x, y, z, vx, vy, vz, t) for each non-star particle
+    states = np.zeros((n_log, n_particles-1, 7)) * np.nan
 
-    return elements, distances, 0
+    return elements, distances, states, 0
 
 def get_log_len(log):
     return log[0].shape[0]
 
 
+def log_state_vectors(sim, states, t_step):
+    """Record the position and velocity state vectors of every non-star
+    (i.e. injected/secondary) particle for the current time step."""
+    particles = sim.particles
+    for i in range(len(particles))[1:]:
+        p = particles[i]
+        states[t_step, i-1] = [p.x, p.y, p.z, p.vx, p.vy, p.vz, sim.t]
+    return states
+
+
 def log_elements(sim, log, mode):
     # sim.status()
     particles = sim.particles
-    elements, distances, t_step = log
+    elements, distances, states, t_step = log
     n_log, n_particles, _ = elements.shape
     n_particles=len(particles)
 
@@ -35,28 +47,31 @@ def log_elements(sim, log, mode):
         
         if p.m > 1e-15:
             if (o.a < 0) or (o.a > 5):
-                halt += "semi-major axis out of bounds\t"
+                halt += f"code=a_out_of_bounds;planet={i};a={o.a}\t"
             elif (o.e < 0) or (o.e > 1):
-                halt += "eccentricity out of bounds\t"
+                halt += f"code=e_out_of_bounds;planet={i};e={o.e}\t"
+
+    states = log_state_vectors(sim, states, t_step)
 
     d = particles[1] ** particles[2]
     distances[t_step] = d
     if mode == 2:
         if d > elements[t_step, 0][0]/2:
-            halt += "binary not bound\t"
+            halt += f"code=binary_unbound;planet=1,2;d={d}\t"
 
 
     t_step += 1
     # halt = o.a < 0
-    return [elements, distances, t_step], halt
+    return [elements, distances, states, t_step], halt
 
 def save_log(log, file="output"):
-    elements, distances, _ = log
+    elements, distances, states, _ = log
     np.save(file+"/elements.npy", elements)
     np.save(file+"/distances.npy", distances)
-    
+    np.save(file+"/states.npy", states)
+
 def calc_moments(log, file=None):
-    elements, _, _= log
+    elements, _, _, _= log
     n_log, n_particles, n_elements = elements.shape
     summary_stats = np.zeros((n_particles, n_elements-1, 4))
     for i in range(n_particles):
@@ -76,7 +91,7 @@ def calc_moments(log, file=None):
 #     plt.close()
     
 def get_derivatives(log):
-    elements, _, _= log
+    elements, _, _, _= log
     decile = int(round(elements.shape[0] / 10))
     first_i = np.mean((elements[:decile-2, :, :5] - elements[2:decile, :, :5]) 
                       / np.mean(elements[:decile-2, :, 5] - elements[2:decile, :, 5]), 

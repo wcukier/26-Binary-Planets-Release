@@ -98,31 +98,14 @@ def run_model(config, mode, debug=0):
     E_err = (E0 - E1)/E0
     L_err = np.sqrt(((Lx0 - Lx1)**2 + (Ly0 - Ly1)**2 + (Lz0 - Lz1)**2)
                     /(Lx0**2+ Ly0**2 + Lx0**2+1e-20))
-    first_i, first_f, second_i, second_f = get_derivatives(log)
     
-    moments = calc_moments(log)
 
     try:
         o = sim.particles[2].orbit(primary=sim.particles[1])
     except Exception as e:
         print(e)
         o = sim.particles[2].orbit(primary=sim.particles[0])
-#     sum_data = np.zeros((26,5)) * np.nan
-#     sum_data[0, 0] = t1-t0
-#     sum_data[1, 0] = E_err
-#     sum_data[2, :2] = [E0, E1]
-#     sum_data[3, 0] = L_err
-#     sum_data[4, :3] = [Lx0, Ly0, Lz0]
-#     sum_data[5, :3] = [Lx1, Ly1, Lz1]
-#     sum_data[6:8, :] = first_i[:2]
-#     sum_data[8:10, :] = first_f[:2]
-#     sum_data[10:12, :] = second_i[:2]
-#     sum_data[12:14, :] = second_f[:2]
-#     sum_data[14:19, :4] = moments[0]
-#     sum_data[19:24, :4] = moments[1]
-#     sum_data[24, :] = [o.a, o.e, o.inc, o.Omega, o.omega]
-#     sum_data[26, 0] = t_end
-#     np.save(f"output/{config['name']}/summary.npy", sum_data)
+
     
     
     with open(f"output/{config['name']}/summary.json", "w+") as cf:

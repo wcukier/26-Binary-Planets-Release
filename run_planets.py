@@ -1,5 +1,5 @@
 from binary_planets.run_model import run_model
-from binary_planets.sim import get_hill_radius
+from binary_planets.sim import get_hill_radius, orbits_cross
 from binary_planets.utils import *  # noqa
 
 from os import sys
@@ -88,12 +88,21 @@ def one_run(run_num, cfg):
             # )
             cfg[f"secondary_{j}"]["m"] = np.random.uniform(0.38, 72)
 
-            cfg[f"secondary_{j}"]["a"] =10 ** np.random.uniform(
-                np.log10(system["gap"][0]), np.log10(system["gap"][1])
-            )
-
-            cfg[f"secondary_{j}"]["e"] = np.random.uniform(0, 1)
-            cfg[f"secondary_{j}"]["inc"] = np.random.uniform(-np.pi, np.pi)
+            # Draw the injected planet, redrawing if its orbit crosses any of
+            # the existing planets' orbits.
+            while True:
+                inj_a = 10 ** np.random.uniform(
+                    np.log10(system["gap"][0]), np.log10(system["gap"][1])
+                )
+                inj_e = np.random.uniform(0, 1)
+                if not any(
+                    orbits_cross(inj_a, inj_e, semi_majors[k], es[k])
+                    for k in range(n_secondary)
+                ):
+                    break
+            cfg[f"secondary_{j}"]["a"] = inj_a
+            cfg[f"secondary_{j}"]["e"] = inj_e
+            cfg[f"secondary_{j}"]["inc"] = np.arccos(np.random.uniform(-1, 1))
             cfg[f"secondary_{j}"]["omega"] = np.random.uniform(-np.pi, np.pi)
             cfg[f"secondary_{j}"]["Omega"] = np.random.uniform(-np.pi, np.pi)
 
@@ -107,26 +116,38 @@ def one_run(run_num, cfg):
             cfg["binary"]["phase"] = np.random.uniform(-np.pi, np.pi)
 
             cfg["binary"]["Omega"] = np.random.uniform(-np.pi, np.pi)
-            cfg["binary"]["inc"] = np.random.uniform(
-                -np.pi, np.pi
-            )  
-            cfg["binary"]["bin_inc"] = np.random.uniform(-np.pi, np.pi) 
+            cfg["binary"]["inc"] = np.arccos(np.random.uniform(-1, 1))
+            cfg["binary"]["bin_inc"] = np.arccos(np.random.uniform(-1, 1))
 
 
-            cfg["binary"]["a"] = 10 ** np.random.uniform(
-                np.log10(system["gap"][0]), np.log10(system["gap"][1])
-            )
-            r_hill = get_hill_radius(
-                cfg["binary"]["a"], cfg["binary"]["e_sys"], mass_total, cfg["m_star"]
-            )
-            cfg["binary"]["d"] = r_hill * np.random.uniform(0, 1.0)
+            # Draw the injected binary, redrawing if the pair's heliocentric
+            # orbit (widened by the binary separation so the whole pair is
+            # accounted for) crosses any of the existing planets' orbits.
+            while True:
+                bin_a = 10 ** np.random.uniform(
+                    np.log10(system["gap"][0]), np.log10(system["gap"][1])
+                )
+                r_hill = get_hill_radius(
+                    bin_a, cfg["binary"]["e_sys"], mass_total, cfg["m_star"]
+                )
+                bin_d = r_hill * np.random.uniform(0, 1.0)
+                if not any(
+                    orbits_cross(
+                        bin_a, cfg["binary"]["e_sys"], semi_majors[k], es[k],
+                        buffer1=bin_d,
+                    )
+                    for k in range(n_secondary)
+                ):
+                    break
+            cfg["binary"]["a"] = bin_a
+            cfg["binary"]["d"] = bin_d
 
         else:
             cfg["binary"]["m1"] = 1e-20
             cfg["binary"]["m2"] = 1e-20
 
         cfg["dt"] = dt
-        cfg["integrator"] = "BS"
+        cfg["integrator"] = "leapfrog"
 #         i = 1
 #         try:
 #             os.mkdir(f"output/{cfg['name']}")
